@@ -801,42 +801,54 @@
 <!-- Toast -->
 <div id="toast"></div>
 
-<script>
+<script type="module">
 // =========================================================
-// STORAGE: URLハッシュベースのクラウド共有（localStorage + URL共有）
+// FIREBASE 設定
 // =========================================================
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, onValue, set, remove, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
-// listId: URLのhashで共有。なければ新規生成
-function getListId() {
-  if (location.hash && location.hash.length > 1) {
-    return location.hash.slice(1);
-  }
-  const id = Math.random().toString(36).slice(2, 10);
-  location.hash = id;
-  return id;
+const firebaseConfig = {
+  apiKey: "AIzaSyBCb3PAMxoj-No_p8YclKsbxzG-oVE-tsg",
+  authDomain: "scanner-bfe14.firebaseapp.com",
+  databaseURL: "https://scanner-bfe14-default-rtdb.firebaseio.com",
+  projectId: "scanner-bfe14",
+  storageBucket: "scanner-bfe14.firebasestorage.app",
+  messagingSenderId: "256573833964",
+  appId: "1:256573833964:web:bc3b21cebe38a250a59bc9"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+// 固定のリストキー（全端末で同じデータを共有）
+const LIST_REF = ref(db, 'items');
+
+function saveItem(code, data) {
+  set(ref(db, 'items/' + code), data);
 }
 
-const LIST_ID = getListId();
-const STORAGE_KEY = 'checklist_' + LIST_ID;
-
-function loadItems() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
+function removeItem(code) {
+  remove(ref(db, 'items/' + code));
 }
 
-function saveItems(items) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+function updateItem(code, data) {
+  update(ref(db, 'items/' + code), data);
 }
 
 // =========================================================
 // UI
 // =========================================================
 
-let items = loadItems();
+let items = {};
 let pendingBarcode = null;
 let modalQty = 1;
+
+// Firebaseからリアルタイムでデータ取得
+onValue(LIST_REF, (snapshot) => {
+  items = snapshot.val() || {};
+  renderList();
+});
 
 function renderList() {
   const ul = document.getElementById('item-list');
@@ -878,8 +890,7 @@ function editName(code, newName) {
   if (!isAdmin || !newName.trim()) return;
   const item = typeof items[code] === 'object' ? items[code] : { name: items[code], qty: 1 };
   item.name = newName.trim();
-  items[code] = item;
-  saveItems(items);
+  updateItem(code, item);
   showToast('商品名を変更しました');
 }
 
@@ -888,9 +899,7 @@ function changeQty(code, delta) {
   if (!items[code]) return;
   const item = typeof items[code] === 'object' ? items[code] : { name: items[code], qty: 1 };
   item.qty = Math.max(1, (item.qty || 1) + delta);
-  items[code] = item;
-  saveItems(items);
-  renderList();
+  updateItem(code, item);
 }
 
 function esc(s) {
@@ -899,9 +908,7 @@ function esc(s) {
 
 function deleteItem(code) {
   if (!isAdmin) return;
-  delete items[code];
-  saveItems(items);
-  renderList();
+  removeItem(code);
   showToast('削除しました');
 }
 
@@ -925,7 +932,6 @@ function copyUrl() {
   navigator.clipboard.writeText(location.href).then(() => {
     showToast('URLをコピーしました！');
   }).catch(() => {
-    // fallback
     const el = document.getElementById('share-url');
     const range = document.createRange();
     range.selectNodeContents(el);
@@ -971,7 +977,6 @@ function startScan() {
     Quagga.start();
   });
 
-  // debounce: 連続検出防止
   let lastCode = null;
   let lastTime = 0;
 
@@ -982,10 +987,7 @@ function startScan() {
     if (code === lastCode && now - lastTime < 2000) return;
     lastCode = code;
     lastTime = now;
-
-    // ビープ感を出すための短い振動
     if (navigator.vibrate) navigator.vibrate(100);
-
     stopScan();
     handleBarcode(code);
   });
@@ -1042,9 +1044,7 @@ async function fetchProductName(barcode) {
     const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
     const data = await res.json();
     if (data.status === 1 && data.product) {
-      return data.product.product_name_ja
-          || data.product.product_name
-          || null;
+      return data.product.product_name_ja || data.product.product_name || null;
     }
   } catch {}
   return null;
@@ -1067,7 +1067,6 @@ async function openModal(code) {
   document.getElementById('item-name-input').value = '';
   document.getElementById('modal-overlay').classList.add('active');
 
-  // 商品名を自動取得
   const indicator = document.getElementById('fetching-indicator');
   indicator.classList.add('active');
   const found = await fetchProductName(code);
@@ -1091,15 +1090,12 @@ function registerItem() {
     showToast('商品名を入力してください');
     return;
   }
-  items[pendingBarcode] = { name, qty: modalQty };
-  saveItems(items);
-  renderList();
+  saveItem(pendingBarcode, { name, qty: modalQty });
   closeModal();
   setResult('✅', '登録しました！', `「${name}」を家にあるリストに追加しました`, 'state-safe');
   showToast('登録しました！');
 }
 
-// Enterキーで登録
 document.getElementById('item-name-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') registerItem();
 });
@@ -1108,8 +1104,8 @@ document.getElementById('item-name-input').addEventListener('keydown', e => {
 // SPEECH SYNTHESIS
 // =========================================================
 
-const SOUND_KEY = 'sound_on_' + LIST_ID;
-let soundOn = localStorage.getItem(SOUND_KEY) !== 'false'; // デフォルトオン
+const SOUND_KEY = 'sound_on';
+let soundOn = localStorage.getItem(SOUND_KEY) !== 'false';
 
 function updateSoundBtn() {
   const btn = document.getElementById('sound-toggle-btn');
@@ -1140,21 +1136,21 @@ function speak(text) {
 }
 
 // =========================================================
+// ADMIN MODE
 // =========================================================
 
-const PIN_KEY = 'admin_pin_' + LIST_ID;
+const PIN_KEY = 'admin_pin';
 let adminPin = localStorage.getItem(PIN_KEY) || '1234';
 let isAdmin = false;
 let pinBuffer = '';
 
-// Long press on header
-let pressTimer = null;
 const header = document.getElementById('main-header');
+let pressTimer = null;
 header.addEventListener('pointerdown', () => {
   pressTimer = setTimeout(() => openPinModal(), 1500);
 });
-header.addEventListener('pointerup',   () => clearTimeout(pressTimer));
-header.addEventListener('pointerleave',() => clearTimeout(pressTimer));
+header.addEventListener('pointerup',    () => clearTimeout(pressTimer));
+header.addEventListener('pointerleave', () => clearTimeout(pressTimer));
 
 function openPinModal() {
   pinBuffer = '';
@@ -1172,9 +1168,7 @@ function pinInput(digit) {
   if (pinBuffer.length >= 4) return;
   pinBuffer += digit;
   updatePinDots();
-  if (pinBuffer.length === 4) {
-    setTimeout(checkPin, 150);
-  }
+  if (pinBuffer.length === 4) setTimeout(checkPin, 150);
 }
 
 function pinDelete() {
@@ -1216,6 +1210,7 @@ function exitAdmin() {
 }
 
 // =========================================================
+// TOAST
 // =========================================================
 
 let toastTimer;
@@ -1228,12 +1223,32 @@ function showToast(msg) {
 }
 
 // =========================================================
+// グローバル関数の公開（HTML onclick から呼び出せるように）
+// =========================================================
+
+window.startScan      = startScan;
+window.stopScan       = stopScan;
+window.closeOverlay   = closeOverlay;
+window.toggleSound    = toggleSound;
+window.copyUrl        = copyUrl;
+window.changeModalQty = changeModalQty;
+window.closeModal     = closeModal;
+window.registerItem   = registerItem;
+window.pinInput       = pinInput;
+window.pinDelete      = pinDelete;
+window.closePinModal  = closePinModal;
+window.exitAdmin      = exitAdmin;
+window.changeQty      = changeQty;
+window.deleteItem     = deleteItem;
+window.editName       = editName;
+
+// =========================================================
 // INIT
 // =========================================================
 
-renderList();
 updateShareUrl();
 updateSoundBtn();
 </script>
+
 </body>
 </html>
