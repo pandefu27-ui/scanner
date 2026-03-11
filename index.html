@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -151,6 +152,24 @@
     font-size: 1.3rem;
     font-weight: 900;
     cursor: pointer;
+  }
+
+  #sound-toggle-btn {
+    background: white;
+    border: 2px solid #eee;
+    border-radius: 20px;
+    padding: 8px 18px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--text);
+    transition: background 0.2s, border 0.2s;
+  }
+  #sound-toggle-btn.on {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
   }
 
   /* ---- ADMIN MODE ---- */
@@ -673,6 +692,11 @@
 
 <main>
 
+  <!-- Sound toggle -->
+  <div id="sound-toggle-wrap" style="display:flex;justify-content:flex-end;">
+    <button id="sound-toggle-btn" onclick="toggleSound()">🔊 音声オン</button>
+  </div>
+
   <!-- Result -->
   <div id="result-card">
     <div id="result-icon">📦</div>
@@ -992,6 +1016,7 @@ function handleBarcode(code) {
     const qtyText = item.qty > 1 ? `${item.qty}個` : '';
     showOverlay('danger', '✕', 'すでにあります！', `「${item.name}」が家に${qtyText}あります。\n買わなくて大丈夫！`);
     setResult('🚫', 'すでにあります！', `「${item.name}」は家にあります。買わなくて大丈夫！`, 'state-danger');
+    speak(`すでにあります。${item.name}が家にあります。買わなくて大丈夫です。`);
   } else {
     setResult('✅', '家にありません', `バーコード: ${code}`, 'state-safe');
     if (isAdmin) {
@@ -1003,6 +1028,7 @@ function handleBarcode(code) {
       };
     } else {
       showOverlay('safe', '〇', '家にありません', '買っても大丈夫です！');
+      speak('家にありません。買っても大丈夫です。');
     }
   }
 }
@@ -1079,7 +1105,41 @@ document.getElementById('item-name-input').addEventListener('keydown', e => {
 });
 
 // =========================================================
-// ADMIN MODE
+// SPEECH SYNTHESIS
+// =========================================================
+
+const SOUND_KEY = 'sound_on_' + LIST_ID;
+let soundOn = localStorage.getItem(SOUND_KEY) !== 'false'; // デフォルトオン
+
+function updateSoundBtn() {
+  const btn = document.getElementById('sound-toggle-btn');
+  if (soundOn) {
+    btn.textContent = '🔊 音声オン';
+    btn.classList.add('on');
+  } else {
+    btn.textContent = '🔇 音声オフ';
+    btn.classList.remove('on');
+  }
+}
+
+function toggleSound() {
+  soundOn = !soundOn;
+  localStorage.setItem(SOUND_KEY, soundOn);
+  updateSoundBtn();
+  if (soundOn) speak('音声をオンにしました');
+}
+
+function speak(text) {
+  if (!soundOn) return;
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'ja-JP';
+  utter.rate = 0.9;
+  window.speechSynthesis.speak(utter);
+}
+
+// =========================================================
 // =========================================================
 
 const PIN_KEY = 'admin_pin_' + LIST_ID;
@@ -1173,6 +1233,7 @@ function showToast(msg) {
 
 renderList();
 updateShareUrl();
+updateSoundBtn();
 </script>
 </body>
 </html>
