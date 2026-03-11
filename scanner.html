@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>おかいものチェッカー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #FFF8F0;
+    --primary: #FF6B35;
+    --primary-dark: #E55A25;
+    --safe: #2ECC71;
+    --danger: #E74C3C;
+    --text: #2C2C2C;
+    --card: #FFFFFF;
+    --shadow: 0 4px 24px rgba(255,107,53,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Zen Maru Gothic', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    text-align: center;
+    padding: 20px 16px 16px;
+    box-shadow: 0 4px 16px rgba(255,107,53,0.3);
+  }
+
+  header h1 {
+    font-size: 1.8rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+  }
+
+  header p {
+    font-size: 0.95rem;
+    margin-top: 4px;
+    opacity: 0.9;
+  }
+
+  main {
+    width: 100%;
+    max-width: 480px;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ---- RESULT CARD ---- */
+  #result-card {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 24px 20px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: background 0.3s;
+  }
+
+  #result-icon {
+    font-size: 3.5rem;
+    line-height: 1;
+  }
+
+  #result-text {
+    font-size: 1.5rem;
+    font-weight: 900;
+  }
+
+  #result-sub {
+    font-size: 1rem;
+    color: #777;
+  }
+
+  .state-danger { background: #FFF0EE; }
+  .state-safe   { background: #EFFFEF; }
+
+  /* ---- SCAN BUTTON ---- */
+  #scan-btn {
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 18px;
+    padding: 22px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(255,107,53,0.4);
+    transition: transform 0.1s, box-shadow 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  #scan-btn:active {
+    transform: scale(0.97);
+    box-shadow: 0 3px 10px rgba(255,107,53,0.3);
+  }
+
+  /* ---- CAMERA OVERLAY ---- */
+  #camera-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #camera-overlay.active { display: flex; }
+
+  #camera-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    aspect-ratio: 3/4;
+    overflow: hidden;
+  }
+
+  #interactive {
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+
+  #interactive video,
+  #interactive canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  /* scanning guide frame */
+  #scan-guide {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 72%;
+    height: 22%;
+    border: 3px solid var(--primary);
+    border-radius: 10px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  #scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 3px;
+    background: var(--primary);
+    animation: scanLine 2s linear infinite;
+    top: 0;
+  }
+
+  @keyframes scanLine {
+    0%   { top: 0%; }
+    100% { top: 100%; }
+  }
+
+  #scan-hint {
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-top: 20px;
+    text-align: center;
+    padding: 0 16px;
+  }
+
+  #close-camera {
+    margin-top: 20px;
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: 2px solid rgba(255,255,255,0.5);
+    border-radius: 40px;
+    padding: 12px 36px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* ---- ITEM LIST ---- */
+  #list-section {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  #list-section h2 {
+    font-size: 1.1rem;
+    font-weight: 900;
+    margin-bottom: 14px;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #item-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #item-list li {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 1rem;
+    font-weight: 700;
+    gap: 8px;
+  }
+
+  #item-list li .item-name {
+    flex: 1;
+    word-break: break-all;
+  }
+
+  #item-list li .item-code {
+    font-size: 0.8rem;
+    color: #aaa;
+    font-weight: 400;
+  }
+
+  .qty-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: white;
+    border-radius: 10px;
+    padding: 4px 8px;
+    border: 2px solid #eee;
+  }
+
+  .qty-btn {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    font-weight: 900;
+    cursor: pointer;
+    color: var(--primary);
+    padding: 0 4px;
+    line-height: 1;
+  }
+
+  .qty-num {
+    font-size: 1.1rem;
+    font-weight: 900;
+    min-width: 1.4em;
+    text-align: center;
+    color: var(--text);
+  }
+
+  .delete-btn {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 1.3rem;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 8px;
+    transition: color 0.2s;
+  }
+  .delete-btn:hover { color: var(--danger); }
+
+  #empty-msg {
+    text-align: center;
+    color: #bbb;
+    font-size: 0.95rem;
+    padding: 10px 0;
+  }
+
+  /* ---- MODAL: Register new item ---- */
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #modal-overlay.active { display: flex; }
+
+  #modal {
+    background: white;
+    border-radius: 24px;
+    padding: 28px 22px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    text-align: center;
+  }
+
+  #modal h2 { font-size: 1.3rem; font-weight: 900; margin-bottom: 6px; }
+  #modal p  { color: #888; font-size: 0.9rem; margin-bottom: 20px; }
+
+  #fetching-indicator {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--primary);
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  #fetching-indicator.active { display: flex; }
+
+  .spinner {
+    width: 18px; height: 18px;
+    border: 3px solid #eee;
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #modal .qty-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  #modal .qty-row label { font-size: 1rem; font-weight: 700; color: #555; }
+  #modal .qty-row .qty-ctrl {
+    background: var(--bg);
+    border: 2px solid #eee;
+    border-radius: 12px;
+    padding: 6px 12px;
+    gap: 12px;
+  }
+  #modal .qty-row .qty-btn { font-size: 1.4rem; }
+  #modal .qty-row .qty-num { font-size: 1.3rem; min-width: 1.8em; }
+
+  #modal input {
+    width: 100%;
+    border: 2px solid #eee;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1.1rem;
+    outline: none;
+    transition: border 0.2s;
+    margin-bottom: 16px;
+  }
+  #modal input:focus { border-color: var(--primary); }
+
+  #modal .modal-btns {
+    display: flex;
+    gap: 10px;
+  }
+
+  #modal .modal-btns button {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  #btn-register {
+    background: var(--primary);
+    color: white;
+  }
+
+  #btn-cancel {
+    background: #f0f0f0;
+    color: #555;
+  }
+
+  /* ---- SHARE ---- */
+  #share-section {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #share-section h2 {
+    font-size: 1.05rem;
+    font-weight: 900;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  #share-section p {
+    font-size: 0.85rem;
+    color: #999;
+    line-height: 1.5;
+  }
+
+  #share-url-box {
+    display: flex;
+    gap: 8px;
+  }
+
+  #share-url {
+    flex: 1;
+    background: var(--bg);
+    border: 2px solid #eee;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    color: #555;
+    word-break: break-all;
+    outline: none;
+    cursor: text;
+    font-family: monospace;
+  }
+
+  #copy-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* toast */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #333;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 40px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    transition: transform 0.3s;
+    z-index: 999;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🛒 おかいものチェッカー</h1>
+  <p>買う前にバーコードをスキャンしよう</p>
+</header>
+
+<main>
+
+  <!-- Result -->
+  <div id="result-card">
+    <div id="result-icon">📦</div>
+    <div id="result-text">スキャン待ち</div>
+    <div id="result-sub">下のボタンを押してください</div>
+  </div>
+
+  <!-- Scan button -->
+  <button id="scan-btn" onclick="startScan()">
+    <span>📷</span> バーコードをよむ
+  </button>
+
+  <!-- Item list -->
+  <div id="list-section">
+    <h2>🏠 家にあるもの <span id="item-count" style="font-weight:400;color:#aaa;font-size:0.9rem;"></span></h2>
+    <ul id="item-list">
+      <li id="empty-msg">まだ登録されていません</li>
+    </ul>
+  </div>
+
+  <!-- Share -->
+  <div id="share-section">
+    <h2>🔗 家族と共有する</h2>
+    <p>このURLを家族に送ると、同じリストを見られます</p>
+    <div id="share-url-box">
+      <div id="share-url">読み込み中...</div>
+      <button id="copy-btn" onclick="copyUrl()">コピー</button>
+    </div>
+  </div>
+
+</main>
+
+<!-- Camera overlay -->
+<div id="camera-overlay">
+  <div id="camera-wrap">
+    <div id="interactive"></div>
+    <div id="scan-guide"><div id="scan-line"></div></div>
+  </div>
+  <div id="scan-hint">バーコードを枠の中に合わせてください</div>
+  <button id="close-camera" onclick="stopScan()">✕ キャンセル</button>
+</div>
+
+<!-- Register modal -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h2>📝 商品を登録しますか？</h2>
+    <p id="modal-barcode-text"></p>
+    <div id="fetching-indicator"><div class="spinner"></div>商品名を検索中...</div>
+    <input type="text" id="item-name-input" placeholder="商品名（例：しょうゆ）" maxlength="30">
+    <div class="qty-row">
+      <label>個数</label>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="changeModalQty(-1)">－</button>
+        <span class="qty-num" id="modal-qty">1</span>
+        <button class="qty-btn" onclick="changeModalQty(1)">＋</button>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button id="btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button id="btn-register" onclick="registerItem()">登録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// =========================================================
+// STORAGE: URLハッシュベースのクラウド共有（localStorage + URL共有）
+// =========================================================
+
+// listId: URLのhashで共有。なければ新規生成
+function getListId() {
+  if (location.hash && location.hash.length > 1) {
+    return location.hash.slice(1);
+  }
+  const id = Math.random().toString(36).slice(2, 10);
+  location.hash = id;
+  return id;
+}
+
+const LIST_ID = getListId();
+const STORAGE_KEY = 'checklist_' + LIST_ID;
+
+function loadItems() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveItems(items) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+// =========================================================
+// UI
+// =========================================================
+
+let items = loadItems();
+let pendingBarcode = null;
+let modalQty = 1;
+
+function renderList() {
+  const ul = document.getElementById('item-list');
+  const keys = Object.keys(items);
+  document.getElementById('item-count').textContent = keys.length ? `（${keys.length}件）` : '';
+
+  if (keys.length === 0) {
+    ul.innerHTML = '<li id="empty-msg">まだ登録されていません</li>';
+    return;
+  }
+
+  ul.innerHTML = keys.map(code => {
+    const item = items[code];
+    const name = typeof item === 'object' ? item.name : item;
+    const qty  = typeof item === 'object' ? (item.qty || 1) : 1;
+    return `
+    <li>
+      <span class="item-name">📦 ${esc(name)}</span>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="changeQty('${esc(code)}', -1)">－</button>
+        <span class="qty-num">${qty}</span>
+        <button class="qty-btn" onclick="changeQty('${esc(code)}', 1)">＋</button>
+      </div>
+      <button class="delete-btn" onclick="deleteItem('${esc(code)}')" title="削除">🗑</button>
+    </li>
+  `}).join('');
+}
+
+function changeQty(code, delta) {
+  if (!items[code]) return;
+  const item = typeof items[code] === 'object' ? items[code] : { name: items[code], qty: 1 };
+  item.qty = Math.max(1, (item.qty || 1) + delta);
+  items[code] = item;
+  saveItems(items);
+  renderList();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function deleteItem(code) {
+  delete items[code];
+  saveItems(items);
+  renderList();
+  showToast('削除しました');
+}
+
+function setResult(icon, text, sub, stateClass) {
+  const card = document.getElementById('result-card');
+  card.className = stateClass ? stateClass : '';
+  document.getElementById('result-icon').textContent = icon;
+  document.getElementById('result-text').textContent = text;
+  document.getElementById('result-sub').textContent = sub;
+}
+
+// =========================================================
+// SHARE URL
+// =========================================================
+
+function updateShareUrl() {
+  document.getElementById('share-url').textContent = location.href;
+}
+
+function copyUrl() {
+  navigator.clipboard.writeText(location.href).then(() => {
+    showToast('URLをコピーしました！');
+  }).catch(() => {
+    // fallback
+    const el = document.getElementById('share-url');
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    showToast('URLを選択しました。長押しでコピーしてください');
+  });
+}
+
+// =========================================================
+// SCAN
+// =========================================================
+
+let scanning = false;
+
+function startScan() {
+  const overlay = document.getElementById('camera-overlay');
+  overlay.classList.add('active');
+  scanning = true;
+
+  Quagga.init({
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: document.getElementById('interactive'),
+      constraints: {
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 960 }
+      }
+    },
+    decoder: {
+      readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader']
+    },
+    locate: true
+  }, err => {
+    if (err) {
+      console.error(err);
+      stopScan();
+      showToast('カメラを起動できませんでした');
+      return;
+    }
+    Quagga.start();
+  });
+
+  // debounce: 連続検出防止
+  let lastCode = null;
+  let lastTime = 0;
+
+  Quagga.onDetected(result => {
+    if (!scanning) return;
+    const code = result.codeResult.code;
+    const now = Date.now();
+    if (code === lastCode && now - lastTime < 2000) return;
+    lastCode = code;
+    lastTime = now;
+
+    // ビープ感を出すための短い振動
+    if (navigator.vibrate) navigator.vibrate(100);
+
+    stopScan();
+    handleBarcode(code);
+  });
+}
+
+function stopScan() {
+  scanning = false;
+  Quagga.stop();
+  document.getElementById('camera-overlay').classList.remove('active');
+}
+
+function handleBarcode(code) {
+  if (items[code]) {
+    const item = typeof items[code] === 'object' ? items[code] : { name: items[code], qty: 1 };
+    const qtyText = item.qty > 1 ? `${item.qty}個` : '';
+    setResult(
+      '🚫',
+      'すでにあります！',
+      `「${item.name}」が家に${qtyText}あります。買わなくて大丈夫！`,
+      'state-danger'
+    );
+  } else {
+    setResult('✅', '家にありません', `バーコード: ${code}`, 'state-safe');
+    openModal(code);
+  }
+}
+
+// =========================================================
+// BARCODE DB LOOKUP
+// =========================================================
+
+async function fetchProductName(barcode) {
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const data = await res.json();
+    if (data.status === 1 && data.product) {
+      return data.product.product_name_ja
+          || data.product.product_name
+          || null;
+    }
+  } catch {}
+  return null;
+}
+
+// =========================================================
+// MODAL
+// =========================================================
+
+function changeModalQty(delta) {
+  modalQty = Math.max(1, modalQty + delta);
+  document.getElementById('modal-qty').textContent = modalQty;
+}
+
+async function openModal(code) {
+  pendingBarcode = code;
+  modalQty = 1;
+  document.getElementById('modal-qty').textContent = '1';
+  document.getElementById('modal-barcode-text').textContent = `バーコード: ${code}`;
+  document.getElementById('item-name-input').value = '';
+  document.getElementById('modal-overlay').classList.add('active');
+
+  // 商品名を自動取得
+  const indicator = document.getElementById('fetching-indicator');
+  indicator.classList.add('active');
+  const found = await fetchProductName(code);
+  indicator.classList.remove('active');
+  if (found) {
+    document.getElementById('item-name-input').value = found;
+    showToast('商品名を自動入力しました');
+  }
+  setTimeout(() => document.getElementById('item-name-input').focus(), 100);
+}
+
+function closeModal() {
+  pendingBarcode = null;
+  document.getElementById('modal-overlay').classList.remove('active');
+  document.getElementById('fetching-indicator').classList.remove('active');
+}
+
+function registerItem() {
+  const name = document.getElementById('item-name-input').value.trim();
+  if (!name) {
+    showToast('商品名を入力してください');
+    return;
+  }
+  items[pendingBarcode] = { name, qty: modalQty };
+  saveItems(items);
+  renderList();
+  closeModal();
+  setResult('✅', '登録しました！', `「${name}」を家にあるリストに追加しました`, 'state-safe');
+  showToast('登録しました！');
+}
+
+// Enterキーで登録
+document.getElementById('item-name-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') registerItem();
+});
+
+// =========================================================
+// TOAST
+// =========================================================
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// =========================================================
+// INIT
+// =========================================================
+
+renderList();
+updateShareUrl();
+</script>
+</body>
+</html>
