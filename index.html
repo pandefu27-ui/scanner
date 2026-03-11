@@ -95,7 +95,180 @@
   .state-danger { background: #FFF0EE; }
   .state-safe   { background: #EFFFEF; }
 
-  /* ---- SCAN BUTTON ---- */
+  /* ---- FULLSCREEN RESULT OVERLAY ---- */
+  #result-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 40px 24px;
+    text-align: center;
+    animation: popIn 0.25s ease;
+  }
+  #result-overlay.active { display: flex; }
+
+  @keyframes popIn {
+    from { transform: scale(0.92); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+  }
+
+  #result-overlay.overlay-danger { background: #E74C3C; }
+  #result-overlay.overlay-safe   { background: #2ECC71; }
+
+  #overlay-icon {
+    font-size: 8rem;
+    line-height: 1;
+    filter: drop-shadow(0 4px 16px rgba(0,0,0,0.15));
+  }
+
+  #overlay-text {
+    font-size: 2.4rem;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    line-height: 1.2;
+  }
+
+  #overlay-sub {
+    font-size: 1.2rem;
+    color: rgba(255,255,255,0.9);
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  #overlay-close {
+    margin-top: 10px;
+    background: rgba(255,255,255,0.25);
+    color: white;
+    border: 3px solid rgba(255,255,255,0.6);
+    border-radius: 50px;
+    padding: 16px 48px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 900;
+    cursor: pointer;
+  }
+
+  /* ---- ADMIN MODE ---- */
+  #admin-bar {
+    display: none;
+    width: 100%;
+    background: #2C2C2C;
+    color: white;
+    text-align: center;
+    padding: 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+  }
+  #admin-bar.active { display: flex; }
+
+  #admin-bar button {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* PIN modal */
+  #pin-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 400;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #pin-overlay.active { display: flex; }
+
+  #pin-modal {
+    background: white;
+    border-radius: 24px;
+    padding: 28px 22px;
+    width: 100%;
+    max-width: 340px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+  #pin-modal h2 { font-size: 1.3rem; font-weight: 900; margin-bottom: 6px; }
+  #pin-modal p  { color: #888; font-size: 0.9rem; margin-bottom: 20px; }
+
+  #pin-dots {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .pin-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #eee;
+    transition: background 0.15s;
+  }
+  .pin-dot.filled { background: var(--primary); }
+
+  #pin-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .pin-key {
+    background: var(--bg);
+    border: none;
+    border-radius: 14px;
+    padding: 16px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 900;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .pin-key:active { background: #eee; }
+  .pin-key.del { font-size: 1.1rem; color: #888; }
+
+  #pin-cancel {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 8px;
+  }
+
+  /* edit name inline */
+  .edit-name-input {
+    flex: 1;
+    border: 2px solid var(--primary);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-family: 'Zen Maru Gothic', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    outline: none;
+  }
+
+  /* header long-press hint */
+  #long-press-hint {
+    font-size: 0.7rem;
+    opacity: 0.6;
+    margin-top: 2px;
+  }
   #scan-btn {
     width: 100%;
     background: var(--primary);
@@ -486,10 +659,17 @@
 </head>
 <body>
 
-<header>
+<header id="main-header">
   <h1>🛒 おかいものチェッカー</h1>
   <p>買う前にバーコードをスキャンしよう</p>
+  <p id="long-press-hint">（ヘッダーを長押しで管理者モード）</p>
 </header>
+
+<!-- Admin bar -->
+<div id="admin-bar">
+  <span>🔓 管理者モード</span>
+  <button onclick="exitAdmin()">終了する</button>
+</div>
 
 <main>
 
@@ -514,7 +694,7 @@
   </div>
 
   <!-- Share -->
-  <div id="share-section">
+  <div id="share-section" style="display:none;">
     <h2>🔗 家族と共有する</h2>
     <p>このURLを家族に送ると、同じリストを見られます</p>
     <div id="share-url-box">
@@ -524,6 +704,14 @@
   </div>
 
 </main>
+
+<!-- Fullscreen result overlay -->
+<div id="result-overlay">
+  <div id="overlay-icon"></div>
+  <div id="overlay-text"></div>
+  <div id="overlay-sub"></div>
+  <button id="overlay-close" onclick="closeOverlay()">とじる</button>
+</div>
 
 <!-- Camera overlay -->
 <div id="camera-overlay">
@@ -554,6 +742,35 @@
       <button id="btn-cancel" onclick="closeModal()">キャンセル</button>
       <button id="btn-register" onclick="registerItem()">登録する</button>
     </div>
+  </div>
+</div>
+
+<!-- PIN modal -->
+<div id="pin-overlay">
+  <div id="pin-modal">
+    <h2>🔐 管理者モード</h2>
+    <p>4桁のPINを入力してください</p>
+    <div id="pin-dots">
+      <div class="pin-dot" id="dot0"></div>
+      <div class="pin-dot" id="dot1"></div>
+      <div class="pin-dot" id="dot2"></div>
+      <div class="pin-dot" id="dot3"></div>
+    </div>
+    <div id="pin-keypad">
+      <button class="pin-key" onclick="pinInput('1')">1</button>
+      <button class="pin-key" onclick="pinInput('2')">2</button>
+      <button class="pin-key" onclick="pinInput('3')">3</button>
+      <button class="pin-key" onclick="pinInput('4')">4</button>
+      <button class="pin-key" onclick="pinInput('5')">5</button>
+      <button class="pin-key" onclick="pinInput('6')">6</button>
+      <button class="pin-key" onclick="pinInput('7')">7</button>
+      <button class="pin-key" onclick="pinInput('8')">8</button>
+      <button class="pin-key" onclick="pinInput('9')">9</button>
+      <button class="pin-key del" onclick="pinDelete()">⌫</button>
+      <button class="pin-key" onclick="pinInput('0')">0</button>
+      <div></div>
+    </div>
+    <button id="pin-cancel" onclick="closePinModal()">キャンセル</button>
   </div>
 </div>
 
@@ -611,20 +828,39 @@ function renderList() {
     const item = items[code];
     const name = typeof item === 'object' ? item.name : item;
     const qty  = typeof item === 'object' ? (item.qty || 1) : 1;
-    return `
-    <li>
-      <span class="item-name">📦 ${esc(name)}</span>
-      <div class="qty-ctrl">
-        <button class="qty-btn" onclick="changeQty('${esc(code)}', -1)">－</button>
-        <span class="qty-num">${qty}</span>
-        <button class="qty-btn" onclick="changeQty('${esc(code)}', 1)">＋</button>
-      </div>
-      <button class="delete-btn" onclick="deleteItem('${esc(code)}')" title="削除">🗑</button>
-    </li>
-  `}).join('');
+
+    if (isAdmin) {
+      return `
+      <li>
+        <input class="edit-name-input" value="${esc(name)}" onchange="editName('${esc(code)}', this.value)">
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty('${esc(code)}', -1)">－</button>
+          <span class="qty-num">${qty}</span>
+          <button class="qty-btn" onclick="changeQty('${esc(code)}', 1)">＋</button>
+        </div>
+        <button class="delete-btn" onclick="deleteItem('${esc(code)}')" title="削除">🗑</button>
+      </li>`;
+    } else {
+      return `
+      <li>
+        <span class="item-name">📦 ${esc(name)}</span>
+        <span class="qty-num" style="color:#aaa;font-size:0.95rem;">${qty}個</span>
+      </li>`;
+    }
+  }).join('');
+}
+
+function editName(code, newName) {
+  if (!isAdmin || !newName.trim()) return;
+  const item = typeof items[code] === 'object' ? items[code] : { name: items[code], qty: 1 };
+  item.name = newName.trim();
+  items[code] = item;
+  saveItems(items);
+  showToast('商品名を変更しました');
 }
 
 function changeQty(code, delta) {
+  if (!isAdmin && !pendingBarcode) return;
   if (!items[code]) return;
   const item = typeof items[code] === 'object' ? items[code] : { name: items[code], qty: 1 };
   item.qty = Math.max(1, (item.qty || 1) + delta);
@@ -638,6 +874,7 @@ function esc(s) {
 }
 
 function deleteItem(code) {
+  if (!isAdmin) return;
   delete items[code];
   saveItems(items);
   renderList();
@@ -736,19 +973,37 @@ function stopScan() {
   document.getElementById('camera-overlay').classList.remove('active');
 }
 
+function showOverlay(type, icon, text, sub) {
+  const ov = document.getElementById('result-overlay');
+  ov.className = 'active ' + (type === 'danger' ? 'overlay-danger' : 'overlay-safe');
+  document.getElementById('overlay-icon').textContent = icon;
+  document.getElementById('overlay-text').textContent = text;
+  document.getElementById('overlay-sub').textContent = sub;
+  if (navigator.vibrate) navigator.vibrate(type === 'danger' ? [200, 100, 200] : 100);
+}
+
+function closeOverlay() {
+  document.getElementById('result-overlay').className = '';
+}
+
 function handleBarcode(code) {
   if (items[code]) {
     const item = typeof items[code] === 'object' ? items[code] : { name: items[code], qty: 1 };
     const qtyText = item.qty > 1 ? `${item.qty}個` : '';
-    setResult(
-      '🚫',
-      'すでにあります！',
-      `「${item.name}」が家に${qtyText}あります。買わなくて大丈夫！`,
-      'state-danger'
-    );
+    showOverlay('danger', '✕', 'すでにあります！', `「${item.name}」が家に${qtyText}あります。\n買わなくて大丈夫！`);
+    setResult('🚫', 'すでにあります！', `「${item.name}」は家にあります。買わなくて大丈夫！`, 'state-danger');
   } else {
     setResult('✅', '家にありません', `バーコード: ${code}`, 'state-safe');
-    openModal(code);
+    if (isAdmin) {
+      showOverlay('safe', '〇', '家にありません', `バーコード: ${code}\n登録しますか？`);
+      document.getElementById('overlay-close').onclick = () => {
+        closeOverlay();
+        document.getElementById('overlay-close').onclick = closeOverlay;
+        openModal(code);
+      };
+    } else {
+      showOverlay('safe', '〇', '家にありません', '買っても大丈夫です！');
+    }
   }
 }
 
@@ -824,7 +1079,83 @@ document.getElementById('item-name-input').addEventListener('keydown', e => {
 });
 
 // =========================================================
-// TOAST
+// ADMIN MODE
+// =========================================================
+
+const PIN_KEY = 'admin_pin_' + LIST_ID;
+let adminPin = localStorage.getItem(PIN_KEY) || '1234';
+let isAdmin = false;
+let pinBuffer = '';
+
+// Long press on header
+let pressTimer = null;
+const header = document.getElementById('main-header');
+header.addEventListener('pointerdown', () => {
+  pressTimer = setTimeout(() => openPinModal(), 1500);
+});
+header.addEventListener('pointerup',   () => clearTimeout(pressTimer));
+header.addEventListener('pointerleave',() => clearTimeout(pressTimer));
+
+function openPinModal() {
+  pinBuffer = '';
+  updatePinDots();
+  document.getElementById('pin-overlay').classList.add('active');
+}
+
+function closePinModal() {
+  document.getElementById('pin-overlay').classList.remove('active');
+  pinBuffer = '';
+  updatePinDots();
+}
+
+function pinInput(digit) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += digit;
+  updatePinDots();
+  if (pinBuffer.length === 4) {
+    setTimeout(checkPin, 150);
+  }
+}
+
+function pinDelete() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots();
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('dot' + i).className = 'pin-dot' + (i < pinBuffer.length ? ' filled' : '');
+  }
+}
+
+function checkPin() {
+  if (pinBuffer === adminPin) {
+    closePinModal();
+    enterAdmin();
+  } else {
+    showToast('PINが違います');
+    pinBuffer = '';
+    updatePinDots();
+  }
+}
+
+function enterAdmin() {
+  isAdmin = true;
+  document.getElementById('admin-bar').classList.add('active');
+  document.getElementById('share-section').style.display = 'flex';
+  renderList();
+  showToast('管理者モードに入りました');
+}
+
+function exitAdmin() {
+  isAdmin = false;
+  document.getElementById('admin-bar').classList.remove('active');
+  document.getElementById('share-section').style.display = 'none';
+  renderList();
+  showToast('管理者モードを終了しました');
+}
+
+// =========================================================
 // =========================================================
 
 let toastTimer;
