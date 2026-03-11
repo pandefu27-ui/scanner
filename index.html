@@ -496,7 +496,7 @@
   }
 
   /* ---- MODAL: Register new item ---- */
-  #modal-overlay {
+  #modal-overlay, #stock-overlay {
     display: none;
     position: fixed;
     inset: 0;
@@ -507,6 +507,7 @@
     padding: 20px;
   }
   #modal-overlay.active { display: flex; }
+  #stock-overlay.active { display: flex; }
 
   #modal {
     background: white;
@@ -769,6 +770,27 @@
   </div>
 </div>
 
+<!-- Stock modal (admin: item exists) -->
+<div id="stock-overlay">
+  <div id="modal">
+    <h2>📦 在庫を管理する</h2>
+    <p id="stock-item-name" style="font-size:1.1rem;font-weight:900;color:var(--text);margin-bottom:4px;"></p>
+    <p id="stock-barcode-text"></p>
+    <div class="qty-row">
+      <label>個数</label>
+      <div class="qty-ctrl">
+        <button class="qty-btn" onclick="changeStockQty(-1)">－</button>
+        <span class="qty-num" id="stock-qty">1</span>
+        <button class="qty-btn" onclick="changeStockQty(1)">＋</button>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button id="btn-cancel" onclick="closeStockModal()">キャンセル</button>
+      <button id="btn-register" onclick="saveStockQty()">保存する</button>
+    </div>
+  </div>
+</div>
+
 <!-- PIN modal -->
 <div id="pin-overlay">
   <div id="pin-modal">
@@ -1016,19 +1038,20 @@ function handleBarcode(code) {
   if (items[code]) {
     const item = typeof items[code] === 'object' ? items[code] : { name: items[code], qty: 1 };
     const qtyText = item.qty > 1 ? `${item.qty}個` : '';
-    showOverlay('danger', '✕', 'すでにあります！', `「${item.name}」が家に${qtyText}あります。\n買わなくて大丈夫！`);
-    setResult('🚫', 'すでにあります！', `「${item.name}」は家にあります。買わなくて大丈夫！`, 'state-danger');
-    speak(`すでにあります。${item.name}が家にあります。買わなくて大丈夫です。`);
-  } else {
-    setResult('✅', '家にありません', `バーコード: ${code}`, 'state-safe');
     if (isAdmin) {
-      showOverlay('safe', '〇', '家にありません', `バーコード: ${code}\n登録しますか？`);
-      document.getElementById('overlay-close').onclick = () => {
-        closeOverlay();
-        document.getElementById('overlay-close').onclick = closeOverlay;
-        openModal(code);
-      };
+      // 管理者：すぐ在庫管理モーダルを表示
+      openStockModal(code);
     } else {
+      showOverlay('danger', '✕', 'すでにあります！', `「${item.name}」が家に${qtyText}あります。\n買わなくて大丈夫！`);
+      setResult('🚫', 'すでにあります！', `「${item.name}」は家にあります。買わなくて大丈夫！`, 'state-danger');
+      speak(`すでにあります。${item.name}が家にあります。買わなくて大丈夫です。`);
+    }
+  } else {
+    if (isAdmin) {
+      // 管理者：すぐ登録モーダルを表示
+      openModal(code);
+    } else {
+      setResult('✅', '家にありません', `バーコード: ${code}`, 'state-safe');
       showOverlay('safe', '〇', '家にありません', '買っても大丈夫です！');
       speak('家にありません。買っても大丈夫です。');
     }
@@ -1099,6 +1122,50 @@ function registerItem() {
 document.getElementById('item-name-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') registerItem();
 });
+
+// =========================================================
+// STOCK MODAL (管理者：在庫数変更)
+// =========================================================
+
+let stockBarcode = null;
+let stockQty = 1;
+
+function openStockModal(code) {
+  stockBarcode = code;
+  const item = typeof items[code] === 'object' ? items[code] : { name: items[code], qty: 1 };
+  stockQty = item.qty || 1;
+  document.getElementById('stock-item-name').textContent = `「${item.name}」`;
+  document.getElementById('stock-barcode-text').textContent = `バーコード: ${code}`;
+  document.getElementById('stock-qty').textContent = stockQty;
+  document.getElementById('stock-overlay').classList.add('active');
+}
+
+function closeStockModal() {
+  stockBarcode = null;
+  document.getElementById('stock-overlay').classList.remove('active');
+}
+
+function changeStockQty(delta) {
+  stockQty = Math.max(0, stockQty + delta);
+  document.getElementById('stock-qty').textContent = stockQty;
+}
+
+function saveStockQty() {
+  if (stockQty === 0) {
+    // 0個にしたら削除確認
+    if (confirm(`「${items[stockBarcode].name || items[stockBarcode]}」を削除しますか？`)) {
+      removeItem(stockBarcode);
+      closeStockModal();
+      showToast('削除しました');
+    }
+    return;
+  }
+  const item = typeof items[stockBarcode] === 'object' ? items[stockBarcode] : { name: items[stockBarcode], qty: 1 };
+  item.qty = stockQty;
+  updateItem(stockBarcode, item);
+  closeStockModal();
+  showToast('在庫数を更新しました');
+}
 
 // =========================================================
 // SPEECH SYNTHESIS
@@ -1226,21 +1293,24 @@ function showToast(msg) {
 // グローバル関数の公開（HTML onclick から呼び出せるように）
 // =========================================================
 
-window.startScan      = startScan;
-window.stopScan       = stopScan;
-window.closeOverlay   = closeOverlay;
-window.toggleSound    = toggleSound;
-window.copyUrl        = copyUrl;
-window.changeModalQty = changeModalQty;
-window.closeModal     = closeModal;
-window.registerItem   = registerItem;
-window.pinInput       = pinInput;
-window.pinDelete      = pinDelete;
-window.closePinModal  = closePinModal;
-window.exitAdmin      = exitAdmin;
-window.changeQty      = changeQty;
-window.deleteItem     = deleteItem;
-window.editName       = editName;
+window.startScan        = startScan;
+window.stopScan         = stopScan;
+window.closeOverlay     = closeOverlay;
+window.toggleSound      = toggleSound;
+window.copyUrl          = copyUrl;
+window.changeModalQty   = changeModalQty;
+window.closeModal       = closeModal;
+window.registerItem     = registerItem;
+window.pinInput         = pinInput;
+window.pinDelete        = pinDelete;
+window.closePinModal    = closePinModal;
+window.exitAdmin        = exitAdmin;
+window.changeQty        = changeQty;
+window.deleteItem       = deleteItem;
+window.editName         = editName;
+window.closeStockModal  = closeStockModal;
+window.changeStockQty   = changeStockQty;
+window.saveStockQty     = saveStockQty;
 
 // =========================================================
 // INIT
